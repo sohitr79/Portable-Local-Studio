@@ -41,7 +41,7 @@ import {
 
 const MODEL_FILTERS = [
   { id: "vision", label: "Vision" },
-  { id: "uncensored", label: "Uncensored" },
+  { id: "uncensored", label: "Unrestricted" },
 ];
 
 const MODEL_LIBRARY = [

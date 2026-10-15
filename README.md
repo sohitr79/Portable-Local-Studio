@@ -16,7 +16,7 @@
 
 <p align="center">
   <a href="https://youtu.be/yeFvP3SWMak">
-    <img src="https://img.youtube.com/vi/yeFvP3SWMak/maxresdefault.jpg" alt="Uncensored AI Studio Video Tutorial" width="800" style="border-radius: 8px;" />
+    <img src="https://img.youtube.com/vi/yeFvP3SWMak/maxresdefault.jpg" alt="AI STUDIO Video Tutorial" width="800" style="border-radius: 8px;" />
   </a>
 </p>
 
@@ -24,7 +24,7 @@
 
 
 ## 📖 Table of Contents
-* [What is Portable AI Studio?](#what-is-uncensored-ai-studio)
+* [What is Portable AI Studio?](#what-is-ai-studio)
 * [Key Features](#key-features)
 * [Workspace & Engine Architecture](#workspace-architecture)
 * [Supported Models](#supported-models)
@@ -40,7 +40,7 @@
 
 ---
 
-## <a id="what-is-uncensored-ai-studio"></a>📖 What is Portable AI Studio?
+## <a id="what-is-ai-studio"></a>📖 What is Portable AI Studio?
 
 **Portable AI Studio** is a completely offline, zero-setup, self-contained AI studio for Windows, Linux, and macOS. Unlike cloud-based AI systems, it runs entirely on your own hardware with no censorship, tracking, subscriptions, or login requirements.
 

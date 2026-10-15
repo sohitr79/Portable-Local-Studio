@@ -7,6 +7,27 @@ const { pathToFileURL } = require("node:url");
 const root = path.resolve(__dirname, "..", "..");
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), "utf8");
 
+test("UI and startup messages use AI STUDIO branding", () => {
+  for (const relativePath of [
+    "windows.bat",
+    "linux.sh",
+    "mac.sh",
+    "app/frontend/index.html",
+    "scripts/server/serve.cjs",
+    "scripts/build/build_from_source.sh",
+    "scripts/setup/setup.ps1",
+    "scripts/setup/setup.sh",
+    "scripts/setup/setup-coreml-npu.sh",
+    "scripts/setup/setup-openvino-npu.ps1",
+    "scripts/setup/setup-openvino-npu.sh",
+    "scripts/setup/setup-whisper.ps1",
+  ]) {
+    assert.doesNotMatch(read(relativePath), /uncensored[ -]ai[ -]studio/i, relativePath);
+  }
+  assert.match(read("app/frontend/index.html"), /<title>AI STUDIO<\/title>/);
+  assert.doesNotMatch(read("app/frontend/src/components/ModelManager.jsx"), /label:\s*"uncensored"/i);
+});
+
 test("text-to-image sends seed and sampling settings to sdapi", async () => {
   const api = read("app/frontend/src/services/api.js");
   assert.match(api, /\/sdapi\/v1\/txt2img/);
