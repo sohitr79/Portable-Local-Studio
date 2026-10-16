@@ -152,6 +152,11 @@ fi
 if [[ ! -x "$BACKEND_PATH" ]]; then
   SETUP_REASON="No macOS Metal backend binary is installed."
 fi
+EXPECTED_SD_BACKEND_VERSION="master-968-8cd731e"
+INSTALLED_SD_BACKEND_VERSION="$(cat "$APP_DIR/backend/mac/.backend-version" 2>/dev/null || true)"
+if [[ "$INSTALLED_SD_BACKEND_VERSION" != "$EXPECTED_SD_BACKEND_VERSION" ]]; then
+  SETUP_REASON="Image backend update required for the current model catalog."
+fi
 if [[ ! -x "$LLM_BACKEND_PATH" ]]; then
   SETUP_REASON="No macOS llama.cpp text backend is installed."
 fi

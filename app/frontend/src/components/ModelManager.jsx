@@ -7,6 +7,7 @@ import {
   importModelFile, 
   deleteModel, 
   downloadModel, 
+  downloadFluxModel,
   downloadOpenVinoModel, 
   cancelModelDownload, 
   getDownloadProgress, 
@@ -102,6 +103,43 @@ const MODEL_LIBRARY = [
         notes: "Semi-realistic, 2.5D, anime, fantasy, and stylized digital art.",
         url: "https://huggingface.co/danbrown/RevAnimated-v1-2-2/resolve/main/rev-animated-v1-2-2.safetensors",
         recommendedTiers: ["Low"],
+      },
+    ],
+  },
+];
+
+const FLUX_MODEL_LIBRARY = [
+  {
+    group: "FLUX.3 Image Klein",
+    items: [
+      {
+        name: "FLUX.3 Image Klein Q4_K_M",
+        filename: "flux3-image-klein-q4",
+        bundleId: "flux3-klein-q4",
+        format: "GGUF + Qwen3-VL",
+        approxSize: "6.1 GB",
+        resolution: "Up to 1024x1024",
+        notes: "Latest 16-step image generation and editing model. Requires the FLUX Kommunity License and substantial RAM/GPU memory.",
+        url: "https://huggingface.co/black-forest-labs/flux-3-image-klein",
+        pageUrl: "https://huggingface.co/black-forest-labs/flux-3-image-klein",
+        recommendedTiers: ["High"],
+      },
+    ],
+  },
+  {
+    group: "FLUX.1 Schnell",
+    items: [
+      {
+        name: "FLUX.1-schnell Q4_0",
+        filename: "flux1-schnell-q4",
+        bundleId: "flux1-schnell-q4",
+        format: "GGUF + FP8 encoders",
+        approxSize: "12.2 GB",
+        resolution: "Up to 1024x1024",
+        notes: "Four-file FLUX.1-schnell bundle. Requires about 12.2 GB download space and substantial system RAM.",
+        url: "https://huggingface.co/city96/FLUX.1-schnell-gguf",
+        pageUrl: "https://huggingface.co/city96/FLUX.1-schnell-gguf",
+        recommendedTiers: ["High"],
       },
     ],
   },
@@ -400,7 +438,7 @@ function ModelManager({
   
   let visibleModelLibrary = [];
   if (activeModelType === "image") {
-    visibleModelLibrary = [...MODEL_LIBRARY];
+    visibleModelLibrary = [...MODEL_LIBRARY, ...FLUX_MODEL_LIBRARY];
     if (openvinoSupported) {
       visibleModelLibrary = [...visibleModelLibrary, ...OPENVINO_MODEL_LIBRARY];
     }
@@ -650,7 +688,10 @@ function ModelManager({
         const status = await getDownloadProgress();
         if (status.active) {
           setDownloadProgress(status.progress === -1 ? 0 : status.progress);
-          setDownloadSpeed(`${status.speed} • ETA ${status.eta}s`);
+          const bundleProgress = status.bundle
+            ? `File ${status.bundle.current}/${status.bundle.total}: ${status.bundle.file} • `
+            : "";
+          setDownloadSpeed(`${bundleProgress}${status.speed} • ETA ${status.eta}s`);
         } else {
           clearInterval(interval);
           setDownloadingModelId(null);
@@ -699,6 +740,29 @@ function ModelManager({
 
   const handleLibraryDownload = async (model) => {
     if (downloadingModelId) return;
+
+    if (model.bundleId) {
+      const isFlux3Bundle = model.bundleId === "flux3-klein-q4";
+      const confirmed = await showConfirm({
+        title: isFlux3Bundle ? "Download FLUX.3 Image Klein?" : "Download FLUX.1-schnell?",
+        message: isFlux3Bundle
+          ? `Download the three-file FLUX.3 Image Klein Q4_K_M bundle (~${model.approxSize})? By downloading, you agree to the FLUX Kommunity License: https://huggingface.co/black-forest-labs/flux-3-image-klein/blob/main/LICENSE.md. Ensure the models drive has at least ${model.approxSize} free.`
+          : `Download the four-file FLUX.1-schnell Q4_0 bundle (~${model.approxSize})? Make sure the models drive has at least ${model.approxSize} free.`,
+        confirmLabel: "Download",
+      });
+      if (!confirmed) return;
+      try {
+        const result = await downloadFluxModel(model.bundleId);
+        if (result.ok) {
+          startProgressPolling(model.filename);
+        } else {
+          showAlert({ title: "Download Failed", message: result.error || "Unknown error", danger: true });
+        }
+      } catch (err) {
+        showAlert({ title: "Download Failed", message: err.message || String(err), danger: true });
+      }
+      return;
+    }
 
     if (activeModelType === "speech") {
       const confirmed = await showConfirm({
@@ -797,6 +861,32 @@ function ModelManager({
     const isOpenVinoSelected = constraints.backendType === "openvino-npu";
     const isOpenVinoModel = modelInfo.backendType === "openvino-npu";
     const isCoreMLModel = modelInfo.format === "CoreML" || modelInfo.backendType === "apple-npu";
+    const isFluxModel = String(modelInfo.format || "").startsWith("FLUX.");
+    const isFlux3Model = modelInfo.format === "FLUX.3 Image Klein";
+    const loadConstraints = isFluxModel
+      ? { ...constraints, steps: isFlux3Model ? 16 : 4, cfgScale: 1, sampler: "euler" }
+      : constraints;
+    if (isFluxModel) setConstraints(loadConstraints);
+    if (isFluxModel && constraints.backendType === "apple-npu") {
+      const targetBackend = backendOptions?.options?.find((backend) => backend.id === "metal")
+        || backendOptions?.options?.find((backend) => backend.id === "cpu");
+      if (!targetBackend) {
+        await showAlert({
+          title: "Compatible Backend Required",
+          message: "FLUX.1-schnell requires the stable-diffusion.cpp Metal or CPU backend, not the CoreML NPU backend.",
+          danger: true,
+        });
+        return;
+      }
+      const nextConstraints = {
+        ...loadConstraints,
+        backendType: targetBackend.id,
+        useGpu: targetBackend.id !== "cpu",
+      };
+      setConstraints(nextConstraints);
+      await performLoadModel(modelId, nextConstraints);
+      return;
+    }
     const isStandardWeights = /\.(safetensors|ckpt|gguf)$/i.test(modelId) || (!isOpenVinoModel && !isCoreMLModel);
     if (isOpenVinoSelected && isStandardWeights) {
       const gpuBackend = backendOptions?.options?.find((backend) =>
@@ -823,7 +913,7 @@ function ModelManager({
       if (!confirmed) return;
 
       const nextConstraints = {
-        ...constraints,
+        ...loadConstraints,
         backendType: targetBackend.id,
         useGpu: targetBackend.id !== "cpu",
       };
@@ -834,7 +924,7 @@ function ModelManager({
 
     const totalSizeBytes = Number(modelInfo.sizeBytes) || 0;
     if (totalSizeBytes <= 0) {
-      await performLoadModel(modelId);
+      await performLoadModel(modelId, loadConstraints);
       return;
     }
 
@@ -852,11 +942,12 @@ function ModelManager({
           modelSizeGb,
           freeVramGb,
           totalVramGb: telemetry.vram_total_gb,
+          loadConstraints,
         });
         return;
       }
     }
-    await performLoadModel(modelId);
+    await performLoadModel(modelId, loadConstraints);
   };
 
   const loadTextModel = async (modelId) => {
@@ -1529,7 +1620,7 @@ function ModelManager({
         ) : displayedLocalModels.length === 0 ? (
           <p style={{ fontSize: "0.9rem", color: "var(--md-sys-color-outline)", textAlign: "center", padding: "16px 0" }}>
             {activeModelType === "image"
-              ? "No image models detected in app/models/. Download from the library below or import a file."
+              ? "No image models detected in app/models/. Download from the library below or add a FLUX.1-schnell bundle folder containing flux-model.json and its four model files."
               : activeModelType === "text"
               ? "No text models detected in app/llm-models/. Download from the library below or import a file."
               : activeModelType === "speech"
@@ -1944,7 +2035,7 @@ function ModelManager({
                     }));
                   }
                   const cpuConstraints = {
-                    ...constraints,
+                    ...(vramWarning.loadConstraints || constraints),
                     backendType: "cpu",
                     useGpu: false,
                   };
@@ -1958,7 +2049,7 @@ function ModelManager({
                 onClick={async () => {
                   const targetModel = vramWarning.modelId;
                   setVramWarning(null);
-                  await performLoadModel(targetModel);
+                  await performLoadModel(targetModel, vramWarning.loadConstraints || constraints);
                 }}
               >
                 Proceed anyway (GPU)

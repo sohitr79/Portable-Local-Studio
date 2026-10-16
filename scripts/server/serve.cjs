@@ -3418,12 +3418,16 @@ function resolveBackendType(useGpu, backendType = "auto", modelPath = "") {
   const options = getBackendOptions();
   let requestedType = useGpu === false ? "cpu" : backendType === "auto" ? options.defaultBackendType : backendType;
 
+  if (modelPath && osPlatform === "darwin" && getFluxModelConfig(modelPath) && requestedType === "apple-npu") {
+    requestedType = "metal";
+  }
+
   if (modelPath && osPlatform === "darwin") {
     const lower = modelPath.toLowerCase();
     const isDir = fs.existsSync(modelPath) && fs.statSync(modelPath).isDirectory();
     if (lower.endsWith(".safetensors") || lower.endsWith(".gguf")) {
       if (requestedType === "apple-npu") requestedType = "metal";
-    } else if (lower.endsWith(".coreml") || lower.endsWith(".mlpackage") || lower.endsWith(".mlmodelc") || isDir) {
+    } else if (!getFluxModelConfig(modelPath) && (lower.endsWith(".coreml") || lower.endsWith(".mlpackage") || lower.endsWith(".mlmodelc") || isDir)) {
       if (requestedType === "metal") requestedType = "apple-npu";
     }
   }
@@ -4577,12 +4581,31 @@ async function startBackend(settings = {}) {
       "--cfg-scale",   String(currentSettings.cfgScale),
     ];
   } else {
+    const fluxModel = getFluxModelConfig(currentSettings.model);
     args = [
       "--listen-port", String(PORT_BACKEND),
-      "--model",       currentSettings.model,
-      "--steps",       String(currentSettings.steps),
+      ...(fluxModel?.variant === "schnell"
+        ? [
+            "--diffusion-model", fluxModel.diffusionModel,
+            "--clip_l", fluxModel.clipL,
+            "--t5xxl", fluxModel.t5xxl,
+            "--vae", fluxModel.vae,
+            "--vae-format", "flux",
+            "--guidance", "0",
+            "--clip-on-cpu",
+          ]
+        : fluxModel
+        ? [
+            "--diffusion-model", fluxModel.diffusionModel,
+            "--llm", fluxModel.llm,
+            "--vae", fluxModel.vae,
+            "--vae-format", "flux2",
+            "--offload-to-cpu",
+          ]
+        : ["--model", currentSettings.model]),
+      "--steps",       String(fluxModel?.variant === "schnell" ? Math.min(Number(currentSettings.steps) || 4, 4) : currentSettings.steps),
       "--cfg-scale",   String(currentSettings.cfgScale),
-      "--sampling-method", currentSettings.sampler,
+      "--sampling-method", fluxModel ? "euler" : currentSettings.sampler,
       "--threads",     String(runThreads),
     ];
 
@@ -4831,6 +4854,125 @@ let downloadState = {
 };
 let activeDownload = null;
 
+const FLUX_MODEL_BUNDLES = {
+  "flux1-schnell-q4": {
+    name: "FLUX.1-schnell Q4_0",
+    folder: "flux1-schnell-q4",
+    totalSizeBytes: 12246090804,
+    files: [
+      {
+        filename: "flux1-schnell-Q4_0.gguf",
+        sizeBytes: 6770707360,
+        url: "https://huggingface.co/city96/FLUX.1-schnell-gguf/resolve/f495746ed9c5efcf4661f53ef05401dceadc17d2/flux1-schnell-Q4_0.gguf",
+      },
+      {
+        filename: "clip_l.safetensors",
+        sizeBytes: 246144152,
+        url: "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/6af2a98e3f615bdfa612fbd85da93d1ed5f69ef5/clip_l.safetensors",
+      },
+      {
+        filename: "t5xxl_fp8_e4m3fn.safetensors",
+        sizeBytes: 4893934904,
+        url: "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/6af2a98e3f615bdfa612fbd85da93d1ed5f69ef5/t5xxl_fp8_e4m3fn.safetensors",
+      },
+      {
+        filename: "ae.safetensors",
+        sizeBytes: 335304388,
+        url: "https://huggingface.co/foxmail/flux_vae/resolve/255c674b959a762476b6e074d87e29c3fae2a3ea/ae.safetensors",
+      },
+    ],
+    manifest: {
+      type: "flux",
+      variant: "schnell",
+      diffusion_model: "flux1-schnell-Q4_0.gguf",
+      clip_l: "clip_l.safetensors",
+      t5xxl: "t5xxl_fp8_e4m3fn.safetensors",
+      vae: "ae.safetensors",
+    },
+  },
+  "flux3-klein-q4": {
+    name: "FLUX.3 Image Klein Q4_K_M",
+    folder: "flux3-image-klein-q4",
+    totalSizeBytes: 6500401020,
+    files: [
+      {
+        filename: "flux-3-image-klein-Q4_K_M.gguf",
+        sizeBytes: 3666908064,
+        url: "https://huggingface.co/unsloth/flux-3-image-klein-GGUF/resolve/d47b7cdcff0074f3ab7609a6927127cfe0004f8d/flux-3-image-klein-Q4_K_M.gguf",
+      },
+      {
+        filename: "Qwen3VL-4B-Instruct-Q4_K_M.gguf",
+        sizeBytes: 2497281664,
+        url: "https://huggingface.co/Qwen/Qwen3-VL-4B-Instruct-GGUF/resolve/1cd86afb9a95c410a6038ab3b40d8b578c892266/Qwen3VL-4B-Instruct-Q4_K_M.gguf",
+      },
+      {
+        filename: "ae.safetensors",
+        sizeBytes: 336211292,
+        url: "https://huggingface.co/ai-toolkit/flux2_vae/resolve/3f679cf232e6d91d28396522d9502c31e8f7ccbe/ae.safetensors",
+      },
+    ],
+    manifest: {
+      type: "flux",
+      variant: "3-klein",
+      diffusion_model: "flux-3-image-klein-Q4_K_M.gguf",
+      llm: "Qwen3VL-4B-Instruct-Q4_K_M.gguf",
+      vae: "ae.safetensors",
+    },
+  },
+};
+
+function startFluxBundleDownload(bundleId) {
+  if (downloadState.active) throw new Error("Another model download is already active.");
+  const bundle = FLUX_MODEL_BUNDLES[bundleId];
+  if (!bundle) throw new Error("Unknown FLUX model bundle.");
+
+  const bundleDir = path.join(MODELS, bundle.folder);
+  ensureStorageCapacity(MODELS, bundle.totalSizeBytes);
+  fs.mkdirSync(bundleDir, { recursive: true });
+  downloadState = {
+    active: true,
+    filename: bundle.folder,
+    progress: 0,
+    speed: "0 MB/s",
+    eta: 0,
+    totalBytes: bundle.totalSizeBytes,
+    downloadedBytes: 0,
+    error: null,
+    kind: "flux",
+    targetDir: bundleDir,
+    bundle: { name: bundle.name, current: 0, total: bundle.files.length, file: "" },
+  };
+
+  console.log(`  [download] Starting ${bundle.name} bundle (${formatBytes(bundle.totalSizeBytes)})`);
+  let nextFileIndex = 0;
+  const downloadNextFile = () => {
+    if (nextFileIndex >= bundle.files.length) {
+      try {
+        fs.writeFileSync(path.join(bundleDir, "flux-model.json"), JSON.stringify(bundle.manifest, null, 2), "utf8");
+        downloadState.active = false;
+        downloadState.filename = bundle.folder;
+        downloadState.progress = 100;
+        downloadState.error = null;
+        downloadState.bundle = null;
+        console.log(`  [download] Completed ${bundle.name} bundle`);
+      } catch (err) {
+        downloadState.active = false;
+        downloadState.error = `Could not write FLUX model manifest: ${err.message}`;
+      }
+      return;
+    }
+
+    const index = nextFileIndex++;
+    const file = bundle.files[index];
+    downloadState.bundle = { name: bundle.name, current: index + 1, total: bundle.files.length, file: file.filename };
+    startModelDownload(file.url, file.filename, bundleDir, "flux", 0, (err) => {
+      if (err) return;
+      downloadNextFile();
+    });
+  };
+  downloadNextFile();
+}
+
 function startOpenVinoModelDownload(modelId) {
   if (downloadState.active) return;
   const npuInfo = getOpenVinoNpuInfo();
@@ -4883,7 +5025,7 @@ const IMAGE_BACKEND_DOWNLOADS = {
   "cpu": {
     id: "cpu",
     label: "CPU",
-    url: "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-782-b290693/sd-master-b290693-bin-win-cpu-x64.zip",
+    url: "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-968-8cd731e/sd-master-8cd731e-bin-win-cpu-x64.zip",
     destDir: path.join(ROOT, "app", "backend", "win", "cpu"),
     exeName: "sd-cpu.exe",
     requiredDll: "stable-diffusion.dll",
@@ -4891,7 +5033,7 @@ const IMAGE_BACKEND_DOWNLOADS = {
   "vulkan": {
     id: "vulkan",
     label: "Vulkan GPU",
-    url: "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-685-19bdfe2/sd-master-19bdfe2-bin-win-vulkan-x64.zip",
+    url: "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-968-8cd731e/sd-master-8cd731e-bin-win-vulkan-x64.zip",
     destDir: path.join(ROOT, "app", "backend", "win", "vulkan"),
     exeName: "sd-vulkan.exe",
     requiredDll: "stable-diffusion.dll",
@@ -4899,7 +5041,7 @@ const IMAGE_BACKEND_DOWNLOADS = {
   "cuda": {
     id: "cuda",
     label: "CUDA GPU",
-    url: "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-782-b290693/sd-master-b290693-bin-win-cuda12-x64.zip",
+    url: "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-968-8cd731e/sd-master-8cd731e-bin-win-cuda12-x64.zip",
     destDir: path.join(ROOT, "app", "backend", "win", "cuda"),
     exeName: "sd-cuda.exe",
     requiredDll: "stable-diffusion.dll",
@@ -5142,7 +5284,7 @@ function describeDownloadHttpError(statusCode, url, headers = {}) {
   return `HTTP ${statusCode}`;
 }
 
-function startModelDownload(url, overrideFilename = null, targetDir = MODELS, kind = "image", redirectCount = 0) {
+function startModelDownload(url, overrideFilename = null, targetDir = MODELS, kind = "image", redirectCount = 0, onComplete = null) {
   if (downloadState.active && !overrideFilename) {
     console.log("  [download] Already downloading a model");
     return;
@@ -5167,6 +5309,7 @@ function startModelDownload(url, overrideFilename = null, targetDir = MODELS, ki
   const destPath = path.join(targetDir, filename);
   const tempPath = `${destPath}.part`;
   try { fs.unlinkSync(tempPath); } catch (_) {}
+  const bundleProgress = kind === "flux" ? downloadState.bundle : null;
   downloadState = {
     active: true,
     filename: filename,
@@ -5177,6 +5320,8 @@ function startModelDownload(url, overrideFilename = null, targetDir = MODELS, ki
     downloadedBytes: 0,
     error: null,
     kind,
+    targetDir,
+    bundle: bundleProgress,
   };
 
   if (redirectCount > 0) {
@@ -5199,6 +5344,7 @@ function startModelDownload(url, overrideFilename = null, targetDir = MODELS, ki
     try { fileStream.close(); } catch (_) {}
     try { fs.unlinkSync(tempPath); } catch (_) {}
     activeDownload = null;
+    if (onComplete) onComplete(new Error(message));
   };
 
   const fileStream = fs.createWriteStream(tempPath);
@@ -5237,7 +5383,7 @@ function startModelDownload(url, overrideFilename = null, targetDir = MODELS, ki
       fileStream.close();
       try { fs.unlinkSync(tempPath); } catch (_) {}
       activeDownload = null;
-      startModelDownload(redirectUrl, filename, targetDir, kind, redirectCount + 1);
+      startModelDownload(redirectUrl, filename, targetDir, kind, redirectCount + 1, onComplete);
       return;
     }
 
@@ -5322,6 +5468,7 @@ function startModelDownload(url, overrideFilename = null, targetDir = MODELS, ki
           downloadState.error = null;
           activeDownload = null;
           console.log(`  [download] Completed download of ${filename}`);
+          if (onComplete) onComplete(null);
         } catch (err) {
           failDownload(`Could not finalize ${filename}: ${err.message}`);
         }
@@ -5393,6 +5540,7 @@ function isModelFile(filename) {
   try {
     const stat = fs.statSync(fullPath);
     if (stat.isDirectory()) {
+      if (getFluxModelConfig(fullPath)) return true;
       const files = fs.readdirSync(fullPath).map(f => f.toLowerCase());
       const hasTextEncoder = files.includes("text_encoder.mlpackage") || 
                              files.includes("text_encoder.mlmodelc") ||
@@ -5423,6 +5571,40 @@ function isModelFile(filename) {
   return false;
 }
 
+function getFluxModelConfig(modelPath) {
+  try {
+    if (!fs.statSync(modelPath).isDirectory()) return null;
+    const manifestPath = path.join(modelPath, "flux-model.json");
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    if (manifest.type !== "flux") return null;
+    const components = manifest.variant === "schnell"
+      ? {
+          diffusionModel: manifest.diffusion_model,
+          clipL: manifest.clip_l,
+          t5xxl: manifest.t5xxl,
+          vae: manifest.vae,
+        }
+      : manifest.variant === "3-klein"
+        ? {
+            diffusionModel: manifest.diffusion_model,
+            llm: manifest.llm,
+            vae: manifest.vae,
+          }
+        : null;
+    if (!components) return null;
+    const resolved = {};
+    for (const [key, filename] of Object.entries(components)) {
+      if (typeof filename !== "string" || !filename || path.basename(filename) !== filename) return null;
+      const filePath = path.join(modelPath, filename);
+      if (!fs.statSync(filePath).isFile()) return null;
+      resolved[key] = filePath;
+    }
+    return { ...resolved, variant: manifest.variant };
+  } catch (_) {
+    return null;
+  }
+}
+
 function formatBytes(bytes) {
   const value = Number(bytes) || 0;
   if (value <= 0) return "0 B";
@@ -5437,6 +5619,16 @@ function getModelLoadIssue(modelPath) {
   const ext = path.extname(lower);
   if (!modelPath || !fs.existsSync(modelPath)) {
     return `Model file not found: ${filename || "unknown model"}`;
+  }
+
+  if (fs.statSync(modelPath).isDirectory()) {
+    const fluxManifestPath = path.join(modelPath, "flux-model.json");
+    if (fs.existsSync(fluxManifestPath)) {
+      return getFluxModelConfig(modelPath)
+        ? null
+        : `${filename} is not a valid FLUX bundle. Add the required component files named in flux-model.json.`;
+    }
+    return null;
   }
 
   const size = getPathSize(modelPath);
@@ -5542,6 +5734,16 @@ function getModelInfo(filename) {
   
   if (stats.isDirectory()) {
     const dirSize = getPathSize(fullPath);
+    const fluxModel = getFluxModelConfig(fullPath);
+    if (fluxModel) {
+      return {
+        filename: safeFilename,
+        sizeBytes: dirSize,
+        size: formatBytes(dirSize),
+        format: fluxModel.variant === "3-klein" ? "FLUX.3 Image Klein" : "FLUX.1-schnell",
+        backendType: fluxModel.variant === "3-klein" ? "flux3" : "flux",
+      };
+    }
     return {
       filename: safeFilename,
       sizeBytes: dirSize,
@@ -6955,6 +7157,17 @@ async function getLlmfitRecommendations(useCase = "chat", limit = 10) {
     return json(res, 200, { ok: true, message: "Download started" });
   }
 
+  if (req.url === "/api/download-flux-model" && req.method === "POST") {
+    const body = await readJsonBody(req, res);
+    if (!body) return;
+    try {
+      startFluxBundleDownload(String(body.model_id || ""));
+      return json(res, 200, { ok: true, message: "FLUX model bundle download started" });
+    } catch (err) {
+      return json(res, 400, { ok: false, error: err.message || String(err) });
+    }
+  }
+
   if (req.url === "/api/llm/download-model" && req.method === "POST") {
     const body = await readJsonBody(req, res);
     if (!body) return;
@@ -7218,8 +7431,8 @@ async function getLlmfitRecommendations(useCase = "chat", limit = 10) {
         console.log(`  [api] Deleted OpenVINO model: ${openvinoModel.id}`);
         return json(res, 200, { ok: true, message: `Deleted ${openvinoModel.name}` });
       } else if (fs.existsSync(modelPath)) {
-        fs.unlinkSync(modelPath);
-        console.log(`  [api] Deleted model file: ${safeFilename}`);
+        fs.rmSync(modelPath, { recursive: true, force: true });
+        console.log(`  [api] Deleted model: ${safeFilename}`);
         return json(res, 200, { ok: true, message: `Deleted ${safeFilename}` });
       } else {
         return json(res, 404, { error: "Model file not found" });

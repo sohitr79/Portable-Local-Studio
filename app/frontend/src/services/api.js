@@ -1259,6 +1259,15 @@ export async function downloadModel(url) {
   }
 }
 
+export async function downloadFluxModel(modelId) {
+  const res = await fetch("/api/download-flux-model", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model_id: modelId }),
+  });
+  return await readJsonResponse(res, "The local server returned an invalid FLUX model download response.");
+}
+
 export async function downloadOpenVinoModel(modelId) {
   try {
     const res = await fetch("/api/download-openvino-model", {

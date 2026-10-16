@@ -44,7 +44,7 @@ else
 fi
 
 # Release pins
-SD_RELEASE="master-685-19bdfe2"
+SD_RELEASE="master-968-8cd731e"
 SD_SHORT_HASH="${SD_RELEASE##*-}"
 SD_BASE_URL="https://github.com/leejet/stable-diffusion.cpp/releases/download/$SD_RELEASE"
 NODE_VERSION="22.12.0"
@@ -287,6 +287,8 @@ linux_backend_is_healthy() {
   local backend_dir="$2"
   local reject_pattern="${3:-}"
   [[ -x "$binary" ]] || return 1
+  [[ -f "$backend_dir/.backend-version" ]] || return 1
+  [[ "$(<"$backend_dir/.backend-version")" == "$SD_RELEASE" ]] || return 1
   command -v ldd >/dev/null 2>&1 || return 0
 
   local output
@@ -433,15 +435,16 @@ if [[ "$PLATFORM" == "Darwin" ]]; then
   fi
 
   MAC_BACKEND="$BACKEND_DIR/sd"
-  if [[ -x "$MAC_BACKEND" ]]; then
+  if [[ -x "$MAC_BACKEND" && -f "$BACKEND_DIR/.backend-version" && "$(<"$BACKEND_DIR/.backend-version")" == "$SD_RELEASE" ]]; then
     print_ok "macOS Metal backend already ready."
   else
     MAC_ZIP="$TOOLS_DIR/sd-mac-metal.zip"
-    download_file "$SD_BASE_URL/sd-master-${SD_SHORT_HASH}-bin-Darwin-macOS-15.7.7-arm64.zip" "$MAC_ZIP" "stable-diffusion.cpp Metal Backend (macOS arm64)"
+    download_file "$SD_BASE_URL/sd-master-${SD_SHORT_HASH}-bin-Darwin-macOS-26.6.2-arm64.zip" "$MAC_ZIP" "stable-diffusion.cpp Metal Backend (macOS arm64)"
     extract_zip "$MAC_ZIP" "$BACKEND_DIR/extracted" "macOS Metal Backend"
     rm -f "$MAC_ZIP"
     copy_macos_backend_from_extracted "$BACKEND_DIR/extracted" "$BACKEND_DIR"
     rm -rf "$BACKEND_DIR/extracted"
+    printf '%s\n' "$SD_RELEASE" > "$BACKEND_DIR/.backend-version"
     print_ok "macOS Metal backend installed."
   fi
 
@@ -483,6 +486,7 @@ if ! linux_backend_is_healthy "$CPU_BACKEND_DIR/sd-server-cpu" "$CPU_BACKEND_DIR
   rm -f "$CPU_ZIP"
   copy_binaries_from_extracted "$CPU_BACKEND_DIR/extracted" "$CPU_BACKEND_DIR" "sd-cpu" "sd-server-cpu"
   rm -rf "$CPU_BACKEND_DIR/extracted"
+  printf '%s\n' "$SD_RELEASE" > "$CPU_BACKEND_DIR/.backend-version"
   print_ok "CPU backend installed."
 else
   print_ok "CPU backend already ready."
@@ -505,6 +509,7 @@ elif ! linux_backend_is_healthy "$VULKAN_BACKEND_DIR/sd-server-vulkan" "$VULKAN_
   rm -f "$VULKAN_ZIP"
   copy_binaries_from_extracted "$VULKAN_BACKEND_DIR/extracted" "$VULKAN_BACKEND_DIR" "sd-vulkan" "sd-server-vulkan"
   rm -rf "$VULKAN_BACKEND_DIR/extracted"
+  printf '%s\n' "$SD_RELEASE" > "$VULKAN_BACKEND_DIR/.backend-version"
   print_ok "Vulkan backend installed."
 else
   print_ok "Vulkan backend already ready."
@@ -514,15 +519,16 @@ chmod +x "$VULKAN_BACKEND_DIR/sd-vulkan" "$VULKAN_BACKEND_DIR/sd-server-vulkan" 
 # ROCm backend (optional --max-perf, or auto-detected AMD)
 ROCM_BACKEND_DIR="$BACKEND_DIR/rocm"
 if [[ $MAX_PERF -eq 1 ]] && [[ "$VENDOR" == "amd" || "$VENDOR" == "" ]]; then
-  if [[ ! -f "$ROCM_BACKEND_DIR/sd-rocm" || ! -f "$ROCM_BACKEND_DIR/sd-server-rocm" ]]; then
+  if ! linux_backend_is_healthy "$ROCM_BACKEND_DIR/sd-server-rocm" "$ROCM_BACKEND_DIR"; then
     mkdir -p "$ROCM_BACKEND_DIR"
     ROCM_ZIP="$TOOLS_DIR/sd-rocm.zip"
-    print_warn "ROCm backend is ~1.2 GB. This may take a while..."
-    download_file "$SD_BASE_URL/sd-master-${SD_SHORT_HASH}-bin-Linux-Ubuntu-24.04-x86_64-rocm-7.13.0.zip" "$ROCM_ZIP" "stable-diffusion.cpp ROCm Backend (Linux x86_64)"
+    print_warn "ROCm backend is about 285 MB. This may take a while..."
+    download_file "$SD_BASE_URL/sd-master-${SD_SHORT_HASH}-bin-Linux-Ubuntu-24.04-x86_64-rocm-10.1.0.zip" "$ROCM_ZIP" "stable-diffusion.cpp ROCm Backend (Linux x86_64)"
     extract_zip "$ROCM_ZIP" "$ROCM_BACKEND_DIR/extracted" "ROCm Backend"
     rm -f "$ROCM_ZIP"
     copy_binaries_from_extracted "$ROCM_BACKEND_DIR/extracted" "$ROCM_BACKEND_DIR" "sd-rocm" "sd-server-rocm"
     rm -rf "$ROCM_BACKEND_DIR/extracted"
+    printf '%s\n' "$SD_RELEASE" > "$ROCM_BACKEND_DIR/.backend-version"
     print_ok "ROCm backend installed."
   else
     print_ok "ROCm backend already ready."

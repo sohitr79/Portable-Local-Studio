@@ -4883,7 +4883,7 @@ const IMAGE_BACKEND_DOWNLOADS = {
   "cpu": {
     id: "cpu",
     label: "CPU",
-    url: "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-782-b290693/sd-master-b290693-bin-win-cpu-x64.zip",
+    url: "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-968-8cd731e/sd-master-8cd731e-bin-win-cpu-x64.zip",
     destDir: path.join(ROOT, "app", "backend", "win", "cpu"),
     exeName: "sd-cpu.exe",
     requiredDll: "stable-diffusion.dll",
@@ -4891,7 +4891,7 @@ const IMAGE_BACKEND_DOWNLOADS = {
   "vulkan": {
     id: "vulkan",
     label: "Vulkan GPU",
-    url: "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-685-19bdfe2/sd-master-19bdfe2-bin-win-vulkan-x64.zip",
+    url: "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-968-8cd731e/sd-master-8cd731e-bin-win-vulkan-x64.zip",
     destDir: path.join(ROOT, "app", "backend", "win", "vulkan"),
     exeName: "sd-vulkan.exe",
     requiredDll: "stable-diffusion.dll",
@@ -4899,7 +4899,7 @@ const IMAGE_BACKEND_DOWNLOADS = {
   "cuda": {
     id: "cuda",
     label: "CUDA GPU",
-    url: "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-782-b290693/sd-master-b290693-bin-win-cuda12-x64.zip",
+    url: "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-968-8cd731e/sd-master-8cd731e-bin-win-cuda12-x64.zip",
     destDir: path.join(ROOT, "app", "backend", "win", "cuda"),
     exeName: "sd-cuda.exe",
     requiredDll: "stable-diffusion.dll",

@@ -76,7 +76,7 @@ To avoid exhausting system RAM or VRAM, text and image engines are mutually excl
 
 ## <a id="supported-models"></a>Supported Models
 
-The app is designed around single-file local models that can be loaded directly by the bundled backend engines.
+The app supports single-file local models plus FLUX.1-schnell and FLUX.3 Image Klein bundles.
 
 ### Image generation
 
@@ -85,10 +85,29 @@ The app is designed around single-file local models that can be loaded directly 
 | Stable Diffusion 1.5 checkpoints | Yes | `app/models/` | Best compatibility. Use `.safetensors` or `.ckpt` files. |
 | SDXL checkpoints | Yes | `app/models/` | Supported as single-file checkpoints. Requires more RAM/VRAM than SD 1.5. |
 | Single-file SD/SDXL GGUF checkpoints | Limited | `app/models/` | Only complete single-file checkpoints are supported. |
+| FLUX.1-schnell Q4_0 | Yes | `app/models/flux1-schnell-q4/` | Download the four-file bundle from Model Manager (about 12.2 GB). Requires substantial RAM/VRAM. |
+| FLUX.3 Image Klein Q4_K_M | Yes | `app/models/flux3-image-klein-q4/` | Download the three-file bundle from Model Manager (about 6.1 GB). FLUX Kommunity License applies. |
 | OpenVINO image model folders | Intel NPU only | `app/openvino-models/` | Download from the Model Manager after running the OpenVINO setup. |
 | CoreML image models | Apple Silicon only | `app/models/` | Requires macOS on Apple Silicon and the CoreML setup path. |
-| Flux, HiDream, Hunyuan, Wan, Qwen Image, Z-Image workflows | No | N/A | These usually require separate diffusion, VAE, and text encoder files and are not one-click checkpoint loads in this app. |
+| FLUX.1-dev, FLUX.3 Klein Base, HiDream, Hunyuan, Wan, Qwen Image, Z-Image workflows | No | N/A | These workflows require model-specific multi-file configurations not currently supported by the app. |
 | LoRA, ControlNet, VAE-only, text-encoder-only, or diffusion-only files | No | N/A | Companion files are not loaded as standalone image models. |
+
+For a manual FLUX.1-schnell install, create `app/models/<bundle>/`, place the diffusion model and matching CLIP-L, T5-XXL, and VAE files in it, then add `flux-model.json`:
+
+```json
+{
+  "type": "flux",
+  "variant": "schnell",
+  "diffusion_model": "flux1-schnell-Q4_0.gguf",
+  "clip_l": "clip_l.safetensors",
+  "t5xxl": "t5xxl_fp16.safetensors",
+  "vae": "ae.safetensors"
+}
+```
+
+Use filenames that match the files you downloaded. Restart or refresh Model Manager; the bundle appears under Local Image Models. FLUX.1-schnell defaults to four Euler steps and keeps CLIP/T5 on the CPU to reduce VRAM use. The text encoders still require substantial system RAM.
+
+FLUX.3 Image Klein is available as a downloadable Model Manager bundle. It uses a quantized image model, Qwen3-VL 4B text encoder, and the FLUX.2 VAE, with the documented 16-step Euler settings. Downloading and using its weights is subject to the [FLUX Kommunity License](https://huggingface.co/black-forest-labs/flux-3-image-klein/blob/main/LICENSE.md). Platform setup scripts update the image backend to a release with FLUX.3 support.
 
 Known-good image models available from the Model Manager:
 

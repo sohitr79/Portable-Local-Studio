@@ -342,7 +342,7 @@ $cpuBackendDest = Join-Path $appDir "backend\win\cpu"
 $cpuBackendExe  = Join-Path $cpuBackendDest "sd-cpu.exe"
 $cpuBackendDll  = Join-Path $cpuBackendDest "stable-diffusion.dll"
 $cpuBackendVersionFile = Join-Path $cpuBackendDest ".backend-version"
-$expectedCpuBackendVersion = "master-782-b290693"
+$expectedCpuBackendVersion = "master-968-8cd731e"
 $installedCpuBackendVersion = if (Test-Path $cpuBackendVersionFile) { (Get-Content $cpuBackendVersionFile -Raw).Trim() } else { "" }
 
 if ((Test-Path $cpuBackendExe) -and (Test-Path $cpuBackendDll) -and ($installedCpuBackendVersion -eq $expectedCpuBackendVersion)) {
@@ -354,7 +354,7 @@ if ((Test-Path $cpuBackendExe) -and (Test-Path $cpuBackendDll) -and ($installedC
     New-Item -ItemType Directory -Force -Path $cpuBackendDest | Out-Null
 
     $ok = Invoke-RichDownload `
-        -Url  "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-782-b290693/sd-master-b290693-bin-win-cpu-x64.zip" `
+        -Url  "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-968-8cd731e/sd-master-8cd731e-bin-win-cpu-x64.zip" `
         -Dest $cpuBackendZip `
         -Label "stable-diffusion.cpp CPU Backend (Windows x64, runtime dispatch)"
 
@@ -398,7 +398,7 @@ if ($hasNvidia) {
     $backendExe  = Join-Path $backendDest "sd-cuda.exe"
     $backendDll  = Join-Path $backendDest "stable-diffusion.dll"
     $backendVersionFile = Join-Path $backendDest ".backend-version"
-    $expectedBackendVersion = "master-782-b290693-cuda12.8.1"
+    $expectedBackendVersion = "master-968-8cd731e-cuda12.8.1"
     $installedBackendVersion = if (Test-Path $backendVersionFile) { (Get-Content $backendVersionFile -Raw).Trim() } else { "" }
     $cudaBackendReady = $false
     
@@ -412,7 +412,7 @@ if ($hasNvidia) {
         New-Item -ItemType Directory -Force -Path $backendDest | Out-Null
 
         $ok = Invoke-RichDownload `
-            -Url  "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-782-b290693/sd-master-b290693-bin-win-cuda12-x64.zip" `
+            -Url  "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-968-8cd731e/sd-master-8cd731e-bin-win-cuda12-x64.zip" `
             -Dest $backendZip `
             -Label "stable-diffusion.cpp CUDA 12.8 Backend (Windows x64)"
 
@@ -462,7 +462,7 @@ if ($hasNvidia) {
             Print-Info "CUDA runtime DLLs are missing from backend folder. Downloading the matching portable CUDA 12.8 runtime..."
             $dllZip = Join-Path $toolsDir "cuda-dlls.zip"
             $ok = Invoke-RichDownload `
-                -Url  "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-782-b290693/cudart-sd-bin-win-cu12-x64.zip" `
+                -Url  "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-968-8cd731e/cudart-sd-bin-win-cu12-x64.zip" `
                 -Dest $dllZip `
                 -Label "CUDA 12.8 Runtime DLLs (stable-diffusion.cpp)"
 
@@ -488,7 +488,7 @@ if ($hasNvidia) {
     $backendExe  = Join-Path $backendDest "sd-vulkan.exe"
     $backendDll  = Join-Path $backendDest "stable-diffusion.dll"
     $backendVersionFile = Join-Path $backendDest ".backend-version"
-    $expectedBackendVersion = "master-685-19bdfe2"
+    $expectedBackendVersion = "master-968-8cd731e"
     $installedBackendVersion = if (Test-Path $backendVersionFile) { (Get-Content $backendVersionFile -Raw).Trim() } else { "" }
 
     if ((Test-Path $backendExe) -and (Test-Path $backendDll) -and ($installedBackendVersion -eq $expectedBackendVersion)) {
@@ -500,7 +500,7 @@ if ($hasNvidia) {
         New-Item -ItemType Directory -Force -Path $backendDest | Out-Null
 
         $ok = Invoke-RichDownload `
-            -Url  "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-685-19bdfe2/sd-master-19bdfe2-bin-win-vulkan-x64.zip" `
+            -Url  "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-968-8cd731e/sd-master-8cd731e-bin-win-vulkan-x64.zip" `
             -Dest $backendZip `
             -Label "stable-diffusion.cpp Vulkan Backend (Windows x64)"
 
@@ -543,7 +543,7 @@ if ($hasNvidia) {
     $backendExe  = Join-Path $backendDest "sd-vulkan.exe"
     $backendDll  = Join-Path $backendDest "stable-diffusion.dll"
     $backendVersionFile = Join-Path $backendDest ".backend-version"
-    $expectedBackendVersion = "master-685-19bdfe2"
+    $expectedBackendVersion = "master-968-8cd731e"
     $installedBackendVersion = if (Test-Path $backendVersionFile) { (Get-Content $backendVersionFile -Raw).Trim() } else { "" }
     
     if ((Test-Path $backendExe) -and (Test-Path $backendDll) -and ($installedBackendVersion -eq $expectedBackendVersion)) {
@@ -555,7 +555,7 @@ if ($hasNvidia) {
         New-Item -ItemType Directory -Force -Path $backendDest | Out-Null
 
         $ok = Invoke-RichDownload `
-            -Url  "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-685-19bdfe2/sd-master-19bdfe2-bin-win-vulkan-x64.zip" `
+            -Url  "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-968-8cd731e/sd-master-8cd731e-bin-win-vulkan-x64.zip" `
             -Dest $backendZip `
             -Label "stable-diffusion.cpp Vulkan Backend (Windows x64)"
 

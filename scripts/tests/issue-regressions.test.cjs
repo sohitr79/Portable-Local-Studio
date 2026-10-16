@@ -28,6 +28,38 @@ test("UI and startup messages use AI STUDIO branding", () => {
   assert.doesNotMatch(read("app/frontend/src/components/ModelManager.jsx"), /label:\s*"uncensored"/i);
 });
 
+test("FLUX.1-schnell bundles are validated and launched with separate components", () => {
+  const server = read("scripts/server/serve.cjs");
+  const manager = read("app/frontend/src/components/ModelManager.jsx");
+  const api = read("app/frontend/src/services/api.js");
+  const readme = read("README.md");
+
+  assert.match(server, /function getFluxModelConfig\(modelPath\)/);
+  assert.match(server, /manifest\.type !== "flux"/);
+  assert.match(server, /"--diffusion-model", fluxModel\.diffusionModel/);
+  assert.match(server, /"--clip_l", fluxModel\.clipL/);
+  assert.match(server, /"--t5xxl", fluxModel\.t5xxl/);
+  assert.match(server, /"--vae", fluxModel\.vae/);
+  assert.match(server, /"--sampling-method", fluxModel \? "euler"/);
+  assert.match(server, /getFluxModelConfig\(modelPath\) && requestedType === "apple-npu"/);
+  assert.match(server, /function startFluxBundleDownload\(bundleId\)/);
+  assert.match(server, /\/api\/download-flux-model/);
+  assert.match(server, /t5xxl_fp8_e4m3fn\.safetensors/);
+  assert.match(server, /flux1-schnell-Q4_0\.gguf/);
+  assert.match(manager, /startsWith\("FLUX\."\)/);
+  assert.match(manager, /bundleId: "flux1-schnell-q4"/);
+  assert.match(manager, /File \$\{status\.bundle\.current\}\/\$\{status\.bundle\.total\}/);
+  assert.match(api, /export async function downloadFluxModel\(modelId\)/);
+  assert.match(manager, /Compatible Backend Required/);
+  assert.match(readme, /"variant": "schnell"/);
+  assert.match(server, /"flux3-klein-q4"/);
+  assert.match(server, /"--llm", fluxModel\.llm/);
+  assert.match(server, /"--vae-format", "flux2"/);
+  assert.match(manager, /FLUX\.3 Image Klein Q4_K_M/);
+  assert.match(manager, /FLUX Kommunity License/);
+  assert.match(manager, /isFlux3Model \? 16 : 4/);
+});
+
 test("text-to-image sends seed and sampling settings to sdapi", async () => {
   const api = read("app/frontend/src/services/api.js");
   assert.match(api, /\/sdapi\/v1\/txt2img/);
@@ -112,6 +144,8 @@ test("macOS launch and setup detect Apple Silicon even under Rosetta", () => {
   ]) {
     assert.match(read(relativePath), /hw\.optional\.arm64/, relativePath);
   }
+  assert.match(read("linux.sh"), /EXPECTED_SD_BACKEND_VERSION="master-968-8cd731e"/);
+  assert.match(read("mac.sh"), /EXPECTED_SD_BACKEND_VERSION="master-968-8cd731e"/);
   assert.match(read("scripts/setup/setup.sh"), /INSTALLED_NODE_ARCH/);
 });
 
@@ -120,12 +154,15 @@ test("Linux setup detects required libraries and rejects mixed ROCm Vulkan files
   assert.match(setup, /libgomp\.so\.1/);
   assert.match(setup, /libvulkan\.so\.1/);
   assert.match(setup, /hipblas\|rocblas\|amdhip/);
+  assert.match(setup, /SD_RELEASE="master-968-8cd731e"/);
+  assert.match(setup, /\.backend-version/);
   assert.match(setup, /rm -f "\$VULKAN_BACKEND_DIR"\/sd-vulkan/);
 });
 
 test("Windows launcher remains ASCII-safe for cmd.exe", () => {
   const launcher = fs.readFileSync(path.join(root, "windows.bat"));
   assert.equal([...launcher].some((byte) => byte > 0x7f), false);
+  assert.match(launcher.toString("ascii"), /EXPECTED_SD_BACKEND_VERSION=master-968-8cd731e/);
 });
 
 test("Windows Vulkan setup repairs issue 10 runtime and RX 580 backend failures", () => {
@@ -134,7 +171,7 @@ test("Windows Vulkan setup repairs issue 10 runtime and RX 580 backend failures"
 
   assert.match(setup, /https:\/\/aka\.ms\/vc14\/vc_redist\.x64\.exe/);
   assert.match(setup, /VCOMP140\.dll/);
-  assert.match(setup, /master-685-19bdfe2\/sd-master-19bdfe2-bin-win-vulkan-x64\.zip/);
+  assert.match(setup, /master-968-8cd731e\/sd-master-8cd731e-bin-win-vulkan-x64\.zip/);
   assert.match(setup, /\.backend-version/);
 
   assert.match(server, /backendName === "vulkan"[\s\S]*?getPreferredVulkanBackendName\(\)/);
@@ -146,9 +183,9 @@ test("Windows setup repairs issue 44 illegal instructions and RTX 50 CUDA runtim
   const setup = read("scripts/setup/setup.ps1");
   const server = read("scripts/server/serve.cjs");
 
-  assert.match(setup, /master-782-b290693\/sd-master-b290693-bin-win-cuda12-x64\.zip/);
-  assert.match(setup, /master-782-b290693\/cudart-sd-bin-win-cu12-x64\.zip/);
-  assert.match(setup, /master-782-b290693\/sd-master-b290693-bin-win-cpu-x64\.zip/);
+  assert.match(setup, /master-968-8cd731e\/sd-master-8cd731e-bin-win-cuda12-x64\.zip/);
+  assert.match(setup, /master-968-8cd731e\/cudart-sd-bin-win-cu12-x64\.zip/);
+  assert.match(setup, /master-968-8cd731e\/sd-master-8cd731e-bin-win-cpu-x64\.zip/);
   assert.doesNotMatch(setup, /cudart-llama-bin-win-cuda-12\.4-x64/);
 
   assert.match(server, /3221225501/);

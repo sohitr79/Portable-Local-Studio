@@ -175,6 +175,15 @@ TTS_RUNTIME_PATH="$APP_DIR/tts-runtime/node_modules/kokoro-js"
 if [[ ! -x "$CPU_BACKEND_PATH" || ! -x "$CPU_SERVER_PATH" ]] && [[ ! -x "$BACKEND_PATH" || ! -x "$VULKAN_SERVER_PATH" ]]; then
   SETUP_REASON="Linux backend binaries are missing or not executable."
 fi
+EXPECTED_SD_BACKEND_VERSION="master-968-8cd731e"
+if [[ -x "$BACKEND_PATH" ]]; then
+  INSTALLED_SD_BACKEND_VERSION="$(cat "$APP_DIR/backend/linux/vulkan/.backend-version" 2>/dev/null || true)"
+else
+  INSTALLED_SD_BACKEND_VERSION="$(cat "$APP_DIR/backend/linux/cpu/.backend-version" 2>/dev/null || true)"
+fi
+if [[ "$INSTALLED_SD_BACKEND_VERSION" != "$EXPECTED_SD_BACKEND_VERSION" ]]; then
+  SETUP_REASON="Image backend update required for the current model catalog."
+fi
 if [[ ! -x "$LLM_CUDA_PATH" && ! -x "$LLM_ROCM_PATH" && ! -x "$LLM_SYCL_PATH" && ! -x "$LLM_VULKAN_PATH" && ! -x "$LLM_CPU_PATH" ]]; then
   SETUP_REASON="Linux llama.cpp text backend is missing or not executable."
 fi

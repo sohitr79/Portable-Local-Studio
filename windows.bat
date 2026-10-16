@@ -49,6 +49,13 @@ if not exist "%TTS_RUNTIME%" (
     set SETUP_REASON=Kokoro text-to-speech runtime is missing.
     goto :run_setup
 )
+set "EXPECTED_SD_BACKEND_VERSION=master-968-8cd731e"
+set "INSTALLED_SD_BACKEND_VERSION="
+if exist "%APP%\backend\win\vulkan\.backend-version" for /f "usebackq delims=" %%a in ("%APP%\backend\win\vulkan\.backend-version") do set "INSTALLED_SD_BACKEND_VERSION=%%a"
+if not "%INSTALLED_SD_BACKEND_VERSION%"=="%EXPECTED_SD_BACKEND_VERSION%" (
+    set SETUP_REASON=Image backend update required for the current model catalog.
+    goto :run_setup
+)
 if exist "%CUDA_BACKEND%" goto :launch
 if exist "%VULKAN_BACKEND%" goto :launch
 set SETUP_REASON=No backend binary is installed.
